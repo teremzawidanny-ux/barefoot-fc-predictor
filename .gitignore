@@ -1,0 +1,11 @@
+# Environment files with secrets
+.env
+.env.local
+backend/.env
+backend/.env.local
+webapp/.env
+webapp/.env.local
+
+# Allow example env files
+!backend/.env.example
+!webapp/.env.example
