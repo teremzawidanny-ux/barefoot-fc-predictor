@@ -22,13 +22,15 @@ const allowed = [
   /^https:\/\/[a-z0-9-]+\.vibecode\.dev$/,
   /^https:\/\/vibecode\.dev$/,
   /^https:\/\/(www\.)?barefootfcworldcup\.com$/,
-  /^https:\/\/barefoot-fc-world-cup\.vercel\.app$/,
+  /^https:\/\/(www\.)?barefoot-fc-predictor\.vercel\.app$/,
 ];
 
 app.use(
   "*",
   cors({
     origin: (origin) => (origin && allowed.some((re) => re.test(origin)) ? origin : null),
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
