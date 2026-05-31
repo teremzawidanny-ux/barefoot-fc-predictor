@@ -4,6 +4,7 @@ export interface DbParticipant {
   full_name: string;
   display_name: string;
   email: string;
+  password_hash: string | null;
   phone: string | null;
   city: string | null;
   country: string | null;

@@ -21,6 +21,7 @@ const joinSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
   displayName: z.string().min(2, 'Display name must be at least 2 characters').max(20, 'Max 20 characters'),
   email: z.string().email('Please enter a valid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   phone: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
@@ -38,6 +39,7 @@ export default function Join() {
       fullName: '',
       displayName: '',
       email: '',
+      password: '',
       phone: '',
       city: '',
       country: '',
@@ -51,6 +53,7 @@ export default function Join() {
         fullName: values.fullName,
         displayName: values.displayName,
         email: values.email,
+        password: values.password,
         phone: values.phone || undefined,
         city: values.city || undefined,
         country: values.country || undefined,
@@ -145,6 +148,25 @@ export default function Join() {
                       <Input
                         type="email"
                         placeholder="you@example.com"
+                        className="bg-field border-stripe text-foreground placeholder:text-muted-foreground focus:border-primary"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="font-body text-xs" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-body text-sm text-foreground">Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="At least 6 characters"
                         className="bg-field border-stripe text-foreground placeholder:text-muted-foreground focus:border-primary"
                         {...field}
                       />

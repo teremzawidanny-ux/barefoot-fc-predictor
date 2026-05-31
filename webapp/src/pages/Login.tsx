@@ -19,6 +19,7 @@ import { ApiError } from '@/lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -29,20 +30,20 @@ export default function Login() {
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '' },
+    defaultValues: { email: '', password: '' },
   });
 
   async function onSubmit(values: LoginFormValues) {
     try {
-      await loginParticipant(values.email);
+      await loginParticipant(values.email, values.password);
       navigate('/predictions');
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        form.setError('email', {
-          message: 'No account found with that email.',
+      if (err instanceof ApiError && (err.status === 401 || err.status === 404)) {
+        form.setError('root', {
+          message: 'Invalid email or password.',
         });
       } else {
-        form.setError('email', {
+        form.setError('root', {
           message: 'Something went wrong. Please try again.',
         });
       }
@@ -64,7 +65,7 @@ export default function Login() {
           </div>
           <h1 className="font-heading text-4xl text-foreground mb-2">WELCOME BACK</h1>
           <p className="font-body text-sm text-muted-foreground">
-            Enter your email to log back in
+            Enter your email and password to log back in
           </p>
         </div>
 
@@ -101,6 +102,31 @@ export default function Login() {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-body text-sm text-foreground">Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Your password"
+                          className="bg-field border-stripe text-foreground placeholder:text-muted-foreground focus:border-primary"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="font-body text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                {form.formState.errors.root ? (
+                  <p className="text-xs font-body text-destructive">
+                    {form.formState.errors.root.message}
+                  </p>
+                ) : null}
 
                 <div className="pt-2">
                   <Button

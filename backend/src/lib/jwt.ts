@@ -15,7 +15,7 @@ export async function signToken(payload: Omit<SessionPayload, 'iat' | 'exp'>): P
     {
       ...payload,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+      exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
     },
     env.JWT_SECRET
   );

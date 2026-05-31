@@ -42,7 +42,7 @@ export async function verifySession(): Promise<{ participant: Participant; isAdm
 // ── Participants ──────────────────────────────────────────────────────
 
 export async function joinParticipant(data: {
-  fullName: string; displayName: string; email: string;
+  fullName: string; displayName: string; email: string; password: string;
   phone?: string; city?: string; country?: string; favoriteTeam?: string;
 }): Promise<{ participant: Participant; token: string; isAdmin: boolean }> {
   const result = await api.post<{ participant: Participant; token: string; isAdmin: boolean }>('/api/auth/join', data);
@@ -51,8 +51,8 @@ export async function joinParticipant(data: {
   return result;
 }
 
-export async function loginParticipant(email: string): Promise<{ participant: Participant; token: string; isAdmin: boolean }> {
-  const result = await api.post<{ participant: Participant; token: string; isAdmin: boolean }>('/api/auth/login', { email });
+export async function loginParticipant(email: string, password: string): Promise<{ participant: Participant; token: string; isAdmin: boolean }> {
+  const result = await api.post<{ participant: Participant; token: string; isAdmin: boolean }>('/api/auth/login', { email, password });
   setToken(result.token);
   setCurrentParticipant(result.participant);
   return result;
