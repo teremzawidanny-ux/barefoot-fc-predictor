@@ -274,7 +274,7 @@ export default function PredictionForm() {
         },
         existingPrediction?.id
       );
-      navigate('/predictions');
+      navigate('/predictions', { state: { justPredictedMatchId: match.id } });
     } catch (err) {
       if (err instanceof ApiError) {
         form.setError('root', { message: err.message });

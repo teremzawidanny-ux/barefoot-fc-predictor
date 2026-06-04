@@ -129,6 +129,7 @@ export function MatchCard({ match, prediction, currentParticipantId, onPredict }
 
   return (
     <div
+      id={`match-card-${match.id}`}
       className={cn(
         'group bg-card border border-border rounded-lg p-4 transition-all duration-200',
         status === 'open' && 'hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 cursor-pointer',
