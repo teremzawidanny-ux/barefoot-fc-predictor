@@ -16,7 +16,7 @@ type UpcomingRange = 'next5days' | 'all-upcoming';
 
 const VIEW_TABS: { key: ViewMode; label: string }[] = [
   { key: 'upcoming', label: 'Upcoming' },
-  { key: 'missing', label: 'My Picks' },
+  { key: 'missing', label: 'To Predict' },
   { key: 'by-group', label: 'By Group' },
   { key: 'all', label: 'All Matches' },
 ];
@@ -235,7 +235,7 @@ export default function Predictions() {
         : `${filteredMatches.length} upcoming`;
     }
     if (viewMode === 'missing') {
-      return `${filteredMatches.length} need predictions`;
+      return `${filteredMatches.length} to predict`;
     }
     return undefined;
   })();
@@ -395,7 +395,7 @@ export default function Predictions() {
       return (
         <div className="bg-card border border-border rounded-lg p-6 text-center">
           <p className="font-body text-sm text-muted-foreground mb-3">
-            Join to track your missing predictions
+            Join to see which matches you still need to predict
           </p>
           <Button
             asChild
@@ -414,7 +414,7 @@ export default function Predictions() {
           upcomingRange === 'next5days'
             ? 'No matches in the next 5 days'
             : 'No upcoming matches',
-        missing: "You're all caught up! No missing predictions.",
+        missing: "You're all caught up! Nothing left to predict.",
         all: 'No matches yet',
       };
       return (
