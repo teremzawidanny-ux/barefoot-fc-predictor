@@ -4,14 +4,6 @@ import { supabase } from '../lib/supabase';
 const leaderboardRouter = new Hono();
 
 leaderboardRouter.get('/', async (c) => {
-  // Attempt RPC first, fall back to manual aggregation
-  const { data: rpcData, error: rpcError } = await supabase.rpc('get_leaderboard');
-
-  if (!rpcError && rpcData) {
-    return c.json({ data: rpcData });
-  }
-
-  // Fallback: manual aggregation
   const { data: participants, error: pError } = await supabase
     .from('participants')
     .select('id, display_name');

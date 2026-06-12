@@ -88,6 +88,7 @@ adminRouter.put('/matches/:id', zValidator('json', updateMatchSchema), async (c)
   if (error || !match) return c.json({ error: { message: 'Failed to update match' } }, 500);
 
   // Auto-recalculate if result is complete and match is completed
+  let scoringResult: { scored: number; errors: number } | null = null;
   if (
     match.status === 'completed' &&
     match.team1_score !== null &&
@@ -95,31 +96,43 @@ adminRouter.put('/matches/:id', zValidator('json', updateMatchSchema), async (c)
     match.winner &&
     match.method
   ) {
-    await recalculateForMatch(match);
+    scoringResult = await recalculateForMatch(match);
+    console.log(`[scoring] Match ${match.match_number}: scored ${scoringResult.scored} predictions, ${scoringResult.errors} errors`);
   }
 
-  return c.json({ data: mapMatch(match) });
+  return c.json({ data: { ...mapMatch(match), scoringResult } });
 });
 
-async function recalculateForMatch(match: DbMatch): Promise<void> {
+async function recalculateForMatch(match: DbMatch): Promise<{ scored: number; errors: number }> {
   if (
     match.team1_score === null ||
     match.team2_score === null ||
     !match.winner ||
     !match.method
   ) {
-    return;
+    return { scored: 0, errors: 0 };
   }
 
-  const { data: predictions } = await supabase
+  const { data: predictions, error: fetchError } = await supabase
     .from('predictions')
     .select('*')
     .eq('match_id', match.id);
 
-  if (!predictions) return;
+  if (fetchError) {
+    console.error(`[scoring] Failed to fetch predictions for match ${match.id}:`, fetchError.message);
+    return { scored: 0, errors: 1 };
+  }
+
+  if (!predictions || predictions.length === 0) {
+    console.log(`[scoring] No predictions found for match ${match.id}`);
+    return { scored: 0, errors: 0 };
+  }
+
+  let scored = 0;
+  let errors = 0;
 
   for (const pred of predictions as DbPrediction[]) {
-    const scored = scorePredicton(
+    const result = scorePredicton(
       {
         team1_score_predicted: pred.team1_score_predicted,
         team2_score_predicted: pred.team2_score_predicted,
@@ -133,17 +146,27 @@ async function recalculateForMatch(match: DbMatch): Promise<void> {
         method: match.method as 'regulation' | 'extra_time' | 'penalties',
       }
     );
-    await supabase
+
+    const { error: updateError } = await supabase
       .from('predictions')
       .update({
-        points_awarded: scored.points_awarded,
-        correct_winner: scored.correct_winner,
-        exact_score: scored.exact_score,
-        correct_goal_difference: scored.correct_goal_difference,
-        correct_method: scored.correct_method,
+        points_awarded: result.points_awarded,
+        correct_winner: result.correct_winner,
+        exact_score: result.exact_score,
+        correct_goal_difference: result.correct_goal_difference,
+        correct_method: result.correct_method,
       })
       .eq('id', pred.id);
+
+    if (updateError) {
+      console.error(`[scoring] Failed to update prediction ${pred.id}:`, updateError.message);
+      errors++;
+    } else {
+      scored++;
+    }
   }
+
+  return { scored, errors };
 }
 
 adminRouter.post('/recalculate', async (c) => {
@@ -156,13 +179,19 @@ adminRouter.post('/recalculate', async (c) => {
     return c.json({ error: { message: 'Failed to load matches' } }, 500);
   }
 
-  let total = 0;
+  let totalMatches = 0;
+  let totalScored = 0;
+  let totalErrors = 0;
+
   for (const match of completedMatches as DbMatch[]) {
-    await recalculateForMatch(match);
-    total++;
+    const result = await recalculateForMatch(match);
+    totalMatches++;
+    totalScored += result.scored;
+    totalErrors += result.errors;
   }
 
-  return c.json({ data: { recalculated: total } });
+  console.log(`[scoring] Recalculated all: ${totalMatches} matches, ${totalScored} predictions scored, ${totalErrors} errors`);
+  return c.json({ data: { recalculated: totalMatches, predictionsScored: totalScored, errors: totalErrors } });
 });
 
 adminRouter.post('/recalculate/:matchId', async (c) => {
@@ -177,8 +206,9 @@ adminRouter.post('/recalculate/:matchId', async (c) => {
   if (match.status !== 'completed')
     return c.json({ error: { message: 'Match is not completed' } }, 409);
 
-  await recalculateForMatch(match);
-  return c.json({ data: { ok: true } });
+  const result = await recalculateForMatch(match);
+  console.log(`[scoring] Recalculated match ${match.match_number}: ${result.scored} predictions, ${result.errors} errors`);
+  return c.json({ data: { ok: true, ...result } });
 });
 
 export { adminRouter };

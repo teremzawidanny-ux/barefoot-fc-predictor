@@ -120,6 +120,7 @@ function MatchRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [scoringMessage, setScoringMessage] = useState<string | null>(null);
 
   const liveStatus = getMatchStatus(match, new Date());
 
@@ -152,9 +153,25 @@ function MatchRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
     };
 
     try {
-      await adminUpdateMatch(updated.id, updated);
+      const result = await adminUpdateMatch(updated.id, updated) as Match & { scoringResult?: { scored: number; errors: number } | null };
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => setSaved(false), 3000);
+
+      if (result.scoringResult) {
+        const { scored, errors } = result.scoringResult;
+        if (errors > 0) {
+          setScoringMessage(`Scored ${scored} predictions (${errors} errors)`);
+        } else if (scored > 0) {
+          setScoringMessage(`Scored ${scored} predictions successfully`);
+        } else {
+          setScoringMessage('No predictions found to score');
+        }
+        setTimeout(() => setScoringMessage(null), 5000);
+      } else if (form.status === 'completed') {
+        setScoringMessage('Result saved. Ensure all fields are filled to trigger scoring.');
+        setTimeout(() => setScoringMessage(null), 5000);
+      }
+
       onSaved();
     } catch {
       setValidationError('Failed to save. Please try again.');
@@ -359,6 +376,12 @@ function MatchRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
             </div>
           )}
 
+          {scoringMessage && (
+            <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-3 py-2">
+              <p className="text-emerald-400 text-xs font-body">{scoringMessage}</p>
+            </div>
+          )}
+
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSave}
@@ -382,6 +405,7 @@ export default function Admin() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [recalcStatus, setRecalcStatus] = useState<'idle' | 'running' | 'done'>('idle');
+  const [recalcMessage, setRecalcMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -417,13 +441,17 @@ export default function Admin() {
 
   async function recalculateScores() {
     setRecalcStatus('running');
+    setRecalcMessage(null);
     try {
-      await adminRecalculate();
+      const result = await adminRecalculate() as { recalculated: number; predictionsScored: number; errors: number };
       await loadData();
       setRecalcStatus('done');
-      setTimeout(() => setRecalcStatus('idle'), 3000);
+      setRecalcMessage(`${result.recalculated} matches, ${result.predictionsScored} predictions scored${result.errors > 0 ? `, ${result.errors} errors` : ''}`);
+      setTimeout(() => { setRecalcStatus('idle'); setRecalcMessage(null); }, 5000);
     } catch {
       setRecalcStatus('idle');
+      setRecalcMessage('Recalculation failed. Check backend connection.');
+      setTimeout(() => setRecalcMessage(null), 5000);
     }
   }
 
@@ -485,6 +513,11 @@ export default function Admin() {
             <RefreshCw size={14} className={cn('mr-2', recalcStatus === 'running' && 'animate-spin')} />
             {recalcStatus === 'running' ? 'Recalculating...' : recalcStatus === 'done' ? 'Scores Recalculated!' : 'Recalculate All Scores'}
           </Button>
+          {recalcMessage && (
+            <span className={cn('font-body text-xs self-center', recalcStatus === 'done' ? 'text-emerald-400' : 'text-destructive')}>
+              {recalcMessage}
+            </span>
+          )}
         </div>
 
         {/* Matches by round */}
