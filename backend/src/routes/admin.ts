@@ -32,7 +32,26 @@ adminRouter.get('/matches', async (c) => {
     .select('*')
     .order('match_number');
   if (error) return c.json({ error: { message: 'Failed to load matches' } }, 500);
-  return c.json({ data: (data as DbMatch[]).map(mapMatch) });
+
+  const { data: predCounts } = await supabase
+    .from('predictions')
+    .select('match_id, points_awarded');
+
+  const statsMap = new Map<string, { total: number; scored: number; unscored: number }>();
+  for (const p of predCounts ?? []) {
+    const stats = statsMap.get(p.match_id) ?? { total: 0, scored: 0, unscored: 0 };
+    stats.total++;
+    if (p.points_awarded !== null) stats.scored++;
+    else stats.unscored++;
+    statsMap.set(p.match_id, stats);
+  }
+
+  const matches = (data as DbMatch[]).map((m) => ({
+    ...mapMatch(m),
+    predictionStats: statsMap.get(m.id) ?? { total: 0, scored: 0, unscored: 0 },
+  }));
+
+  return c.json({ data: matches });
 });
 
 adminRouter.put('/matches/:id', zValidator('json', updateMatchSchema), async (c) => {
@@ -192,6 +211,86 @@ adminRouter.post('/recalculate', async (c) => {
 
   console.log(`[scoring] Recalculated all: ${totalMatches} matches, ${totalScored} predictions scored, ${totalErrors} errors`);
   return c.json({ data: { recalculated: totalMatches, predictionsScored: totalScored, errors: totalErrors } });
+});
+
+adminRouter.get('/matches/:id/scoring-report', async (c) => {
+  const matchId = c.req.param('id');
+  const { data: match, error: mErr } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('id', matchId)
+    .single<DbMatch>();
+
+  if (mErr || !match) return c.json({ error: { message: 'Match not found' } }, 404);
+
+  const [{ data: predictions }, { data: participants }] = await Promise.all([
+    supabase.from('predictions').select('*').eq('match_id', match.id),
+    supabase.from('participants').select('id, display_name, email'),
+  ]);
+
+  const participantMap = new Map((participants ?? []).map((p: any) => [p.id, p]));
+
+  const hasResult = match.status === 'completed' && match.team1_score !== null && match.team2_score !== null && match.winner && match.method;
+
+  const report = (predictions ?? []).map((pred: any) => {
+    const participant = participantMap.get(pred.participant_id);
+    const expected = hasResult
+      ? scorePredicton(
+          {
+            team1_score_predicted: pred.team1_score_predicted,
+            team2_score_predicted: pred.team2_score_predicted,
+            winner_predicted: pred.winner_predicted,
+            method_predicted: pred.method_predicted,
+          },
+          {
+            team1_score: match.team1_score!,
+            team2_score: match.team2_score!,
+            winner: match.winner!,
+            method: match.method as 'regulation' | 'extra_time' | 'penalties',
+          }
+        )
+      : null;
+
+    return {
+      predictionId: pred.id,
+      participantName: participant?.display_name ?? 'Unknown',
+      participantEmail: participant?.email ?? 'Unknown',
+      predictedScore: `${pred.team1_score_predicted}-${pred.team2_score_predicted}`,
+      winnerPredicted: pred.winner_predicted,
+      methodPredicted: pred.method_predicted,
+      submittedAt: pred.submitted_at,
+      updatedAt: pred.updated_at,
+      storedPoints: pred.points_awarded,
+      expectedPoints: expected?.points_awarded ?? null,
+      mismatch: expected !== null && pred.points_awarded !== expected.points_awarded,
+      winnerMatch: pred.winner_predicted === match.winner,
+      winnerMatchTrimmed: pred.winner_predicted?.trim().toLowerCase() === match.winner?.trim().toLowerCase(),
+      scoringBreakdown: expected,
+    };
+  });
+
+  const scored = report.filter((r: any) => r.storedPoints !== null).length;
+  const unscored = report.filter((r: any) => r.storedPoints === null).length;
+  const mismatched = report.filter((r: any) => r.mismatch).length;
+
+  return c.json({
+    data: {
+      match: {
+        id: match.id,
+        matchNumber: match.match_number,
+        team1Actual: match.team1_actual,
+        team2Actual: match.team2_actual,
+        team1Score: match.team1_score,
+        team2Score: match.team2_score,
+        winner: match.winner,
+        method: match.method,
+        status: match.status,
+        predictionDeadline: match.prediction_deadline,
+      },
+      summary: { total: report.length, scored, unscored, mismatched },
+      predictions: report,
+    },
+  });
 });
 
 adminRouter.post('/recalculate/:matchId', async (c) => {

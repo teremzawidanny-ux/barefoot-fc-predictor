@@ -31,6 +31,7 @@ export interface Match {
   winner?: string;
   method?: MatchMethod;
   groupName?: string;
+  predictionStats?: { total: number; scored: number; unscored: number };
 }
 
 export interface Prediction {

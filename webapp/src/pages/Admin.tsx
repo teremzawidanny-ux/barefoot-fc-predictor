@@ -202,6 +202,14 @@ function MatchRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
           </span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
+          {match.status === 'completed' && match.predictionStats ? (
+            <span className={cn('text-xs font-body px-2 py-0.5 rounded-full',
+              match.predictionStats.unscored > 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
+            )}>
+              {match.predictionStats.scored}/{match.predictionStats.total} scored
+              {match.predictionStats.unscored > 0 ? ` (${match.predictionStats.unscored} unscored)` : ''}
+            </span>
+          ) : null}
           <span className={cn('text-xs font-body px-2 py-0.5 rounded-full',
             liveStatus === 'open' ? 'bg-emerald-500/20 text-emerald-400' :
             liveStatus === 'teams_pending' ? 'bg-amber-500/20 text-amber-400' :

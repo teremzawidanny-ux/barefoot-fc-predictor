@@ -23,7 +23,7 @@ export interface ScoringResult {
 }
 
 export function scorePredicton(pred: PredictionScoringInput, match: MatchRow): ScoringResult {
-  const correctWinner = pred.winner_predicted === match.winner;
+  const correctWinner = pred.winner_predicted.trim().toLowerCase() === match.winner.trim().toLowerCase();
   if (!correctWinner) {
     return {
       points_awarded: 0,
@@ -40,7 +40,7 @@ export function scorePredicton(pred: PredictionScoringInput, match: MatchRow): S
   const correctGoalDifference =
     Math.abs(pred.team1_score_predicted - pred.team2_score_predicted) ===
     Math.abs(match.team1_score - match.team2_score);
-  const correctMethod = pred.method_predicted === match.method;
+  const correctMethod = pred.method_predicted.trim().toLowerCase() === match.method.trim().toLowerCase();
   if (correctGoalDifference) points += 1;
   if (exactScore) points += 3;
   if (correctMethod) points += 1;
