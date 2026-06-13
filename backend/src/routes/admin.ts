@@ -33,9 +33,19 @@ adminRouter.get('/matches', async (c) => {
     .order('match_number');
   if (error) return c.json({ error: { message: 'Failed to load matches' } }, 500);
 
-  const { data: predCounts } = await supabase
-    .from('predictions')
-    .select('match_id, points_awarded');
+  const allPredCounts: any[] = [];
+  let pcFrom = 0;
+  while (true) {
+    const { data: page } = await supabase
+      .from('predictions')
+      .select('match_id, points_awarded')
+      .range(pcFrom, pcFrom + 999);
+    if (!page || page.length === 0) break;
+    allPredCounts.push(...page);
+    if (page.length < 1000) break;
+    pcFrom += 1000;
+  }
+  const predCounts = allPredCounts;
 
   const statsMap = new Map<string, { total: number; scored: number; unscored: number }>();
   for (const p of predCounts ?? []) {
@@ -289,6 +299,60 @@ adminRouter.get('/matches/:id/scoring-report', async (c) => {
       },
       summary: { total: report.length, scored, unscored, mismatched },
       predictions: report,
+    },
+  });
+});
+
+adminRouter.get('/leaderboard-debug', async (c) => {
+  const { data: participants } = await supabase.from('participants').select('id, display_name, email');
+  const allPreds: any[] = [];
+  let dbgFrom = 0;
+  while (true) {
+    const { data: page } = await supabase
+      .from('predictions')
+      .select('participant_id, match_id, points_awarded, correct_winner')
+      .range(dbgFrom, dbgFrom + 999);
+    if (!page || page.length === 0) break;
+    allPreds.push(...page);
+    if (page.length < 1000) break;
+    dbgFrom += 1000;
+  }
+
+  const { data: matches } = await supabase.from('matches').select('id, match_number, status').eq('status', 'completed');
+  const matchMap = new Map((matches ?? []).map((m: any) => [m.id, m.match_number]));
+
+  const participantMap = new Map((participants ?? []).map((p: any) => [p.id, p]));
+  const byParticipant = new Map<string, any[]>();
+  for (const pred of allPreds) {
+    const arr = byParticipant.get(pred.participant_id) ?? [];
+    arr.push(pred);
+    byParticipant.set(pred.participant_id, arr);
+  }
+
+  const debug = Array.from(byParticipant.entries()).map(([pid, preds]) => {
+    const p = participantMap.get(pid);
+    const scored = preds.filter((pr: any) => pr.points_awarded !== null);
+    const totalPoints = preds.reduce((sum: number, pr: any) => sum + (pr.points_awarded ?? 0), 0);
+    return {
+      participantId: pid,
+      displayName: p?.display_name ?? 'Unknown',
+      email: p?.email ?? 'Unknown',
+      totalPredictions: preds.length,
+      scoredPredictions: scored.length,
+      totalPoints,
+      scoredDetails: scored.map((pr: any) => ({
+        matchNumber: matchMap.get(pr.match_id) ?? '?',
+        pointsAwarded: pr.points_awarded,
+        correctWinner: pr.correct_winner,
+      })),
+    };
+  }).sort((a, b) => b.totalPoints - a.totalPoints);
+
+  return c.json({
+    data: {
+      totalPredictionsInDb: allPreds.length,
+      totalParticipants: participants?.length ?? 0,
+      participants: debug,
     },
   });
 });

@@ -12,11 +12,20 @@ leaderboardRouter.get('/', async (c) => {
     return c.json({ error: { message: 'Failed to load leaderboard' } }, 500);
   }
 
-  const { data: predictions } = await supabase
-    .from('predictions')
-    .select(
-      'participant_id, points_awarded, correct_winner, exact_score, correct_goal_difference, correct_method'
-    );
+  const allPredictions: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: page } = await supabase
+      .from('predictions')
+      .select('participant_id, points_awarded, correct_winner, exact_score, correct_goal_difference, correct_method')
+      .range(from, from + pageSize - 1);
+    if (!page || page.length === 0) break;
+    allPredictions.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  const predictions = allPredictions;
 
   type LeaderboardEntry = {
     participantId: string;
